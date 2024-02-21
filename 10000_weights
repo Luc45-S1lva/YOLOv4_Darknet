@@ -1,0 +1,123 @@
+# clone darknet repo
+!git clone https://github.com/AlexeyAB/darknet
+
+# change makefile to have GPU, OPENCV and LIBSO enabled
+%cd darknet
+!sed -i 's/OPENCV=0/OPENCV=1/' Makefile
+!sed -i 's/GPU=0/GPU=1/' Makefile
+!sed -i 's/CUDNN=0/CUDNN=1/' Makefile
+!sed -i 's/CUDNN_HALF=0/CUDNN_HALF=1/' Makefile
+!sed -i 's/LIBSO=0/LIBSO=1/' Makefile
+
+# make darknet (builds darknet so that you can then use the darknet.py file and have its dependencies)
+!make
+
+%cd /content/
+
+!pwd
+
+# get bthe scaled yolov4 weights file that is pre-trained to detect 6 classes (objects) from shared google drive
+!wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1bxZFAMWEudmE1qRXGdHtxK9XAWzwmkhI' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1bxZFAMWEudmE1qRXGdHtxK9XAWzwmkhI" -O yolov4-csp.weights && rm -rf /tmp/cookies.txt
+
+!wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1Ks7RFhGdMUeSyjPwp3HWJw_C3geGlAtL' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1Ks7RFhGdMUeSyjPwp3HWJw_C3geGlAtL" -O yolov4_custom.cfg && rm -rf /tmp/cookies.txt
+
+!wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1pyFXkb_2zJSLjaMqOAyCX26JMHOYd0BD' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1pyFXkb_2zJSLjaMqOAyCX26JMHOYd0BD" -O obj.data && rm -rf /tmp/cookies.txt
+
+!wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1ROFXsdpaYZn9jFPHSBxdv70BD9BckF5x' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1ROFXsdpaYZn9jFPHSBxdv70BD9BckF5x" -O obj.names && rm -rf /tmp/cookies.txt
+
+%cp yolov4_custom.cfg /content/darknet/cfg
+%cp obj.data /content/darknet/cfg
+%cp obj.names /content/darknet/data/
+%cp yolov4-csp.weights /content/darknet/
+
+%cd /content/darknet
+
+%pwd
+
+# import darknet functions to perform object detections
+from darknet import *
+import darknet
+# load in our YOLOv4 architecture network
+network, class_names, class_colors = load_network("cfg/yolov4_custom.cfg", "cfg/obj.data", "yolov4-csp.weights")
+width = darknet.network_width(network)
+height = darknet.network_height(network)
+
+# darknet helper function to run detection on image
+def darknet_helper(img, width, height):
+  darknet_image = darknet.make_image(width, height, 3)
+  img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+  img_resized = cv2.resize(img_rgb, (width, height),
+                              interpolation=cv2.INTER_LINEAR)
+
+  # get image ratios to convert bounding boxes to proper size
+  img_height, img_width, _ = img.shape
+  width_ratio = img_width/width
+  height_ratio = img_height/height
+
+  # run model on darknet style image to get detections
+  darknet.copy_image_from_bytes(darknet_image, img_resized.tobytes())
+  detections = darknet.detect_image(network, class_names, darknet_image)
+  darknet.free_image(darknet_image)
+  return detections, width_ratio, height_ratio
+
+from google.colab import drive
+
+drive.mount('/content/gdrive')
+
+# Send Detected Object Name to Notebook
+if detections:
+        if label == "Person_In" and "Avaria":
+            dados = {"placa":"ABC-1234",
+                        "cor":"azul","avariado":"true",
+                        "carga":1000,"carregamento":"trigo",
+                        "sobrecarga":"false",
+                        "pneus":["novo","novo", "meia-vida","meia-vida"],
+                        "posicionamento":"centralizado",
+                        "tipo": "bitrem",
+                        "pesagemOK":"false"}
+            string_json = json.dumps(dados)
+            f = open("/content/gdrive/MyDrive/Cursos/recursos/YOLO/recursos/dados_cam.txt", "w")
+            f.write(string_json)
+            f.close()
+
+        if label == "Person_In" and "Truck_In":
+            dados = {"placa":"ABC-1234",
+                     "cor":"azul","avariado":"false",
+                     "carga":1000,"carregamento":"trigo",
+                     "sobrecarga":"false",
+                     "pneus":["novo","novo", "meia-vida","meia-vida"],
+                     "posicionamento":"centralizado",
+                     "tipo": "bitrem",
+                     "pesagemOK":"false"}
+            string_json = json.dumps(dados)
+            f = open("/content/gdrive/MyDrive/Cursos/recursos/YOLO/recursos/dados_cam.txt", "w")
+            f.write(string_json)
+            f.close()
+
+        if label == "Avaria":
+            dados = {"placa":"ABC-1234",
+                     "cor":"azul","avariado":"true",
+                     "carga":1000,"carregamento":"trigo",
+                     "sobrecarga":"false",
+                     "pneus":["novo","novo", "meia-vida","meia-vida"],
+                     "posicionamento":"centralizado",
+                     "tipo": "bitrem",
+                     "pesagemOK":"true"}
+            string_json = json.dumps(dados)
+            f = open("/content/gdrive/MyDrive/Cursos/recursos/YOLO/recursos/dados_cam.txt", "w")
+            f.write(string_json)
+            f.close()
+
+        if label == "Truck_In":
+            dados = {"placa":"ABC-1234",
+                     "cor":"azul","avariado":"false",
+                     "carga":1000,"carregamento":"trigo",
+                     "sobrecarga":"false",
+                     "pneus":["novo","novo", "meia-vida","meia-vida"],
+                     "posicionamento":"centralizado",
+                     "tipo": "bitrem",
+                     "pesagemOK":"true"}
+            string_json = json.dumps(dados)
+            f = open("/content/gdrive/MyDrive/Cursos/recursos/YOLO/recursos/dados_cam.txt", "w")
+            f.write(string_json)
+            f.close()
